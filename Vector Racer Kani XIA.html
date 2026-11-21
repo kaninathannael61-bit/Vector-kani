@@ -1,0 +1,1207 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vector Racer — Kinematics Telemetry Simulator</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter & JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        cyber: {
+                            bg: '#060B19',
+                            panel: '#0D1528',
+                            card: '#131F3A',
+                            border: '#1E2F54',
+                            cyan: '#00F0FF',
+                            purple: '#9D4EDD',
+                            amber: '#FFB703',
+                            rose: '#FF2A6D',
+                            emerald: '#05FFA1'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #060B19;
+            color: #E2E8F0;
+            overflow-x: hidden;
+        }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0D1528;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #1E2F54;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #00F0FF;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col font-sans selection:bg-cyber-cyan selection:text-cyber-bg">
+
+    <!-- Top Navigation Bar -->
+    <header class="sticky top-0 z-40 bg-cyber-panel/90 backdrop-blur-md border-b border-cyber-border px-4 py-3">
+        <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
+            <!-- Brand Logo -->
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-cyber-cyan to-cyber-purple flex items-center justify-center text-cyber-bg font-bold text-lg shadow-lg shadow-cyber-cyan/20">
+                    <i class="fa-solid fa-flag-checkered"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold tracking-tight text-white flex items-center gap-2">
+                        VECTOR RACER
+                        <span class="text-[10px] font-mono uppercase px-2 py-0.5 rounded-full bg-cyber-cyan/15 text-cyber-cyan border border-cyber-cyan/30">Kinematics Engine</span>
+                    </h1>
+                    <p class="text-xs text-slate-400">Simulasi Kinematika 2D & Kontrol Vektor Percepatan Mobil</p>
+                </div>
+            </div>
+
+            <!-- Player Profile & Cloud Status -->
+            <div class="flex items-center gap-2">
+                <div class="hidden sm:flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg bg-cyber-card border border-cyber-border">
+                    <span id="cloud-dot" class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+                    <span id="cloud-status" class="text-slate-300 font-mono">Connecting...</span>
+                </div>
+                <div class="flex items-center bg-cyber-card border border-cyber-border rounded-lg px-2.5 py-1">
+                    <i class="fa-solid fa-helmet-safety text-cyber-cyan text-xs mr-2"></i>
+                    <input id="player-name" type="text" maxlength="16" placeholder="Nama Pembalap" value="Racer_01"
+                        class="bg-transparent text-xs font-mono text-white focus:outline-none w-24 sm:w-28"
+                        onchange="saveNickname()">
+                </div>
+                <button onclick="toggleHelpModal(true)" class="p-2 rounded-lg bg-cyber-card hover:bg-cyber-border text-slate-300 transition" title="Panduan Bermain">
+                    <i class="fa-solid fa-circle-question"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Custom Notification Toast -->
+    <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+    <!-- Main Content Area: Responsive Layout (Canvas & Controls First on Mobile, Balanced 2-Column on Desktop) -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-4 md:p-6">
+        <section id="view-racer" class="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6 items-start">
+            
+            <!-- RIGHT COLUMN ON DESKTOP (8 cols), TOP ON MOBILE/TABLET: Track Canvas, Quick Action Bar & Telemetry -->
+            <div class="order-1 lg:order-2 lg:col-span-8 flex flex-col gap-4">
+                
+                <!-- Track Canvas Card -->
+                <div class="bg-cyber-panel border border-cyber-border rounded-2xl p-3 sm:p-4 shadow-xl flex flex-col gap-3">
+                    <!-- Track Selector Header -->
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <div class="flex flex-wrap items-center gap-1.5" id="track-selector-buttons">
+                            <button onclick="selectTrack(0)" data-track="0" class="track-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-cyber-cyan text-cyber-bg transition">1. Orbital Chicane</button>
+                            <button onclick="selectTrack(1)" data-track="1" class="track-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-cyber-card text-slate-300 hover:text-white transition">2. Canyon Hairpin</button>
+                            <button onclick="selectTrack(2)" data-track="2" class="track-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-cyber-card text-slate-300 hover:text-white transition">3. Reactor Loop</button>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span id="track-difficulty" class="text-xs font-mono text-cyber-amber">Pemula</span>
+                            <span id="racer-status-badge" class="text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-cyber-card text-cyber-cyan border border-cyber-cyan/30">STANDBY</span>
+                        </div>
+                    </div>
+
+                    <!-- Responsive Simulation Canvas (Locked 16:10 Aspect Ratio, Logical 800x500) -->
+                    <div class="relative w-full aspect-[16/10] bg-[#060A14] rounded-xl overflow-hidden border border-cyber-border shadow-inner">
+                        <canvas id="racer-canvas" width="800" height="500" class="w-full h-full block"></canvas>
+                    </div>
+
+                    <!-- Primary Playback Action Bar (Always immediately accessible under canvas) -->
+                    <div class="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-1">
+                        <button id="btn-run" onclick="racerRun()" class="py-2.5 px-3 rounded-xl bg-cyber-emerald hover:brightness-110 active:scale-[0.98] text-cyber-bg font-bold text-xs sm:text-sm transition flex items-center justify-center gap-1.5 shadow-lg shadow-cyber-emerald/20 cursor-pointer">
+                            <i class="fa-solid fa-play"></i> Run
+                        </button>
+                        <button id="btn-pause" onclick="racerPause()" class="py-2.5 px-3 rounded-xl bg-cyber-amber hover:brightness-110 active:scale-[0.98] text-cyber-bg font-bold text-xs sm:text-sm transition flex items-center justify-center gap-1.5 cursor-pointer">
+                            <i class="fa-solid fa-pause"></i> Pause
+                        </button>
+                        <button onclick="racerStep()" class="py-2.5 px-3 rounded-xl bg-cyber-card hover:bg-cyber-border active:scale-[0.98] border border-cyber-border text-white font-semibold text-xs sm:text-sm transition flex items-center justify-center gap-1.5 cursor-pointer">
+                            <i class="fa-solid fa-forward-step"></i> Step
+                        </button>
+                        <button onclick="racerReset()" class="py-2.5 px-3 rounded-xl bg-cyber-rose/20 hover:bg-cyber-rose/30 active:scale-[0.98] border border-cyber-rose/50 text-cyber-rose font-semibold text-xs sm:text-sm transition flex items-center justify-center gap-1.5 cursor-pointer">
+                            <i class="fa-solid fa-rotate-left"></i> Reset
+                        </button>
+                        <button onclick="loadSampleSolution()" class="col-span-2 sm:col-span-1 py-2.5 px-3 rounded-xl bg-cyber-purple/25 hover:bg-cyber-purple/35 active:scale-[0.98] border border-cyber-purple/50 text-cyber-purple font-bold text-xs sm:text-sm transition flex items-center justify-center gap-1.5 cursor-pointer">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i> Solusi
+                        </button>
+                    </div>
+
+                    <!-- Compact Telemetry Bar -->
+                    <div class="grid grid-cols-3 sm:grid-cols-6 gap-2 font-mono text-xs pt-1">
+                        <div class="bg-cyber-bg p-2 rounded-xl border border-cyber-border">
+                            <div class="text-[10px] text-slate-400">WAKTU (t)</div>
+                            <div id="tel-time" class="text-xs sm:text-sm font-bold text-white mt-0.5">0.00 s</div>
+                        </div>
+                        <div class="bg-cyber-bg p-2 rounded-xl border border-cyber-border">
+                            <div class="text-[10px] text-slate-400">LAJU |v|</div>
+                            <div id="tel-speed" class="text-xs sm:text-sm font-bold text-cyber-rose mt-0.5">0.0</div>
+                        </div>
+                        <div class="bg-cyber-bg p-2 rounded-xl border border-cyber-border">
+                            <div class="text-[10px] text-slate-400">CHECKPOINT</div>
+                            <div id="tel-cp" class="text-xs sm:text-sm font-bold text-cyber-emerald mt-0.5">0 / 3</div>
+                        </div>
+                        <div class="bg-cyber-bg p-2 rounded-xl border border-cyber-border">
+                            <div class="text-[10px] text-slate-400">POSISI (x,y)</div>
+                            <div id="tel-pos" class="text-xs font-semibold text-slate-200 mt-0.5">0, 0</div>
+                        </div>
+                        <div class="bg-cyber-bg p-2 rounded-xl border border-cyber-border">
+                            <div class="text-[10px] text-slate-400">Vx / Vy</div>
+                            <div id="tel-vel" class="text-xs font-semibold text-slate-200 mt-0.5">0 / 0</div>
+                        </div>
+                        <div class="bg-cyber-bg p-2 rounded-xl border border-cyber-border">
+                            <div class="text-[10px] text-slate-400">VEKTOR (a)</div>
+                            <div id="tel-acc" class="text-xs font-semibold text-cyber-amber mt-0.5">0 @ 0°</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- LEFT COLUMN ON DESKTOP (4 cols), BELOW CANVAS ON MOBILE/TABLET: Schedule Editor, Log & Leaderboard -->
+            <div class="order-2 lg:order-1 lg:col-span-4 flex flex-col gap-4">
+                
+                <!-- Thruster Schedule Editor Card -->
+                <div class="bg-cyber-panel border border-cyber-border rounded-2xl p-4 shadow-xl flex flex-col gap-3">
+                    <div class="flex items-center justify-between border-b border-cyber-border pb-2.5">
+                        <div>
+                            <h2 class="text-xs sm:text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                                <i class="fa-solid fa-terminal text-cyber-cyan"></i>
+                                Jadwal Percepatan
+                            </h2>
+                            <p class="text-[11px] font-mono text-cyber-amber mt-0.5">#time, duration, accel, angle</p>
+                        </div>
+                        <div class="flex items-center gap-1.5">
+                            <label class="cursor-pointer text-xs py-1.5 px-2.5 rounded-lg bg-cyber-card hover:bg-cyber-border border border-cyber-border text-slate-200 font-medium transition" title="Import file .txt">
+                                <i class="fa-solid fa-file-import text-cyber-cyan"></i>
+                                <input type="file" id="import-file" accept=".txt,.csv" class="hidden" onchange="importScript(event)">
+                            </label>
+                            <button onclick="exportScript()" class="text-xs py-1.5 px-2.5 rounded-lg bg-cyber-card hover:bg-cyber-border border border-cyber-border text-slate-200 font-medium transition" title="Export ke .txt">
+                                <i class="fa-solid fa-file-export text-cyber-amber"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="text-[11px] text-slate-300 bg-cyber-bg/80 border border-cyber-border/80 rounded-xl p-2.5 leading-relaxed">
+                        <span class="text-cyber-cyan font-semibold">Sudut (°):</span> 0° Kanan, 90° Atas, 180° Kiri, -90° Bawah. Gunakan gaya berlawanan untuk mengerem sebelum tikungan.
+                    </div>
+
+                    <!-- Code Editor Textarea (Clean, Single Instance, Comfortable Height) -->
+                    <textarea id="accel-script" rows="9" spellcheck="false"
+                        class="w-full h-48 sm:h-52 bg-cyber-bg border border-cyber-border focus:border-cyber-cyan rounded-xl p-3 font-mono text-xs text-cyber-emerald focus:outline-none leading-relaxed resize-y"
+                        placeholder="# time, duration, accel, angle&#10;0.0, 2.0, 100, 0"></textarea>
+
+                    <!-- Vector Overlay Toggle & Legend -->
+                    <div class="flex flex-col gap-2 pt-1 border-t border-cyber-border">
+                        <label class="flex items-center gap-2 cursor-pointer select-none">
+                            <input id="toggle-vectors" type="checkbox" checked onchange="drawRacerCanvas()" class="w-4 h-4 accent-cyber-cyan rounded">
+                            <span class="text-xs text-slate-300">Tampilkan Vektor Kecepatan & Percepatan</span>
+                        </label>
+                        <div class="flex flex-wrap gap-3 text-[11px] font-mono">
+                            <span class="flex items-center gap-1.5 text-cyber-cyan"><span class="w-2 h-2 rounded-full bg-cyber-cyan inline-block"></span>Jejak</span>
+                            <span class="flex items-center gap-1.5 text-cyber-rose"><span class="w-2 h-2 rounded-full bg-cyber-rose inline-block"></span>Kecepatan (v)</span>
+                            <span class="flex items-center gap-1.5 text-cyber-amber"><span class="w-2 h-2 rounded-full bg-cyber-amber inline-block"></span>Percepatan (a)</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Race Event Log -->
+                <div class="bg-cyber-panel border border-cyber-border rounded-2xl p-3.5 shadow-xl">
+                    <div class="text-xs font-bold text-slate-400 mb-1.5 flex items-center justify-between">
+                        <span><i class="fa-solid fa-satellite-dish text-cyber-cyan mr-1.5"></i>Race Log</span>
+                        <button onclick="clearRaceLog()" class="text-[10px] text-slate-500 hover:text-slate-300">Bersihkan</button>
+                    </div>
+                    <div id="race-log" class="font-mono text-[11px] text-slate-300 max-h-24 overflow-y-auto space-y-1">
+                        <div>> Sistem siap. Tekan Run untuk memulai balapan.</div>
+                    </div>
+                </div>
+
+                <!-- Racer Global Leaderboard (Firestore) -->
+                <div class="bg-cyber-panel border border-cyber-border rounded-2xl p-3.5 shadow-xl">
+                    <div class="flex items-center justify-between mb-2">
+                        <h3 class="text-xs font-bold text-white flex items-center gap-1.5">
+                            <i class="fa-solid fa-trophy text-cyber-amber"></i>
+                            Top 5 (<span id="lb-track-name" class="text-cyber-cyan">Orbital Chicane</span>)
+                        </h3>
+                        <span class="text-[10px] text-slate-400 font-mono">Cloud Sync</span>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse text-[11px] font-mono">
+                            <thead>
+                                <tr class="border-b border-cyber-border text-slate-400">
+                                    <th class="py-1.5 px-1.5">#</th>
+                                    <th class="py-1.5 px-1.5">Pembalap</th>
+                                    <th class="py-1.5 px-1.5">Waktu</th>
+                                    <th class="py-1.5 px-1.5">Baris</th>
+                                </tr>
+                            </thead>
+                            <tbody id="racer-leaderboard-body" class="divide-y divide-cyber-border/50">
+                                <tr><td colspan="4" class="py-2 text-center text-slate-500">Memuat peringkat...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+    </main>
+
+    <!-- Instructions / Help Modal -->
+    <div id="help-modal" class="fixed inset-0 z-50 hidden bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-cyber-panel border border-cyber-border rounded-2xl max-w-xl w-full p-6 shadow-2xl space-y-4">
+            <div class="flex items-center justify-between border-b border-cyber-border pb-3">
+                <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-book-open text-cyber-cyan"></i>
+                    Panduan Bermain Vector Racer
+                </h3>
+                <button onclick="toggleHelpModal(false)" class="text-slate-400 hover:text-white text-lg">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="space-y-3 text-xs sm:text-sm text-slate-300 leading-relaxed max-h-[65vh] overflow-y-auto pr-1">
+                <div class="p-3 rounded-xl bg-cyber-bg border border-cyber-border">
+                    <h4 class="font-bold text-cyber-cyan mb-1">Cara Mengendalikan Mobil</h4>
+                    <p>Programkan vektor percepatan mobil menggunakan format baris: <code class="text-cyber-amber">waktu_mulai, durasi, percepatan, sudut</code>.</p>
+                    <ul class="list-disc list-inside mt-2 text-slate-400 space-y-1">
+                        <li><strong>Hukum Kinematika:</strong> Mobil mempertahankan kecepatan inersianya (<code class="text-white">v = v₀ + a·Δt</code>). Untuk berbelok tajam, berikan percepatan berlawanan arah untuk mengerem kecepatan lama sambil mendorong ke arah jalur baru.</li>
+                        <li><strong>Sudut (°):</strong> <code class="text-white">0°</code> ke kanan, <code class="text-white">90°</code> ke atas, <code class="text-white">180°</code> ke kiri, <code class="text-white">-90°</code> ke bawah.</li>
+                        <li><strong>Target:</strong> Lewati seluruh lingkaran <strong>Checkpoint</strong> secara berurutan lalu kembali ke garis <strong>Start/Finish</strong> tanpa keluar dari batas jalan.</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="flex justify-end pt-2">
+                <button onclick="toggleHelpModal(false)" class="px-5 py-2 rounded-xl bg-cyber-cyan text-cyber-bg font-bold text-xs sm:text-sm hover:brightness-110 transition">
+                    Mengerti, Mulai Balapan!
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK & Application Logic -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc, addDoc, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // ==========================================
+        // 1. FIREBASE CLOUD INITIALIZATION
+        // ==========================================
+        let db = null;
+        let auth = null;
+        let currentUser = null;
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'vector-racer-default';
+
+        let localRacerScores = [
+            { nickname: 'AeroBot_AI', trackIndex: 0, time: 18.80, lines: 8 },
+            { nickname: 'Newton_99', trackIndex: 0, time: 20.45, lines: 9 },
+            { nickname: 'Kepler_X', trackIndex: 1, time: 22.90, lines: 12 },
+            { nickname: 'Gauss_Pro', trackIndex: 2, time: 20.15, lines: 10 }
+        ];
+
+        async function initCloud() {
+            const dot = document.getElementById('cloud-dot');
+            const statusText = document.getElementById('cloud-status');
+            try {
+                if (typeof __firebase_config !== 'undefined' && __firebase_config) {
+                    const firebaseConfig = JSON.parse(__firebase_config);
+                    const app = initializeApp(firebaseConfig);
+                    auth = getAuth(app);
+                    db = getFirestore(app);
+
+                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                        await signInWithCustomToken(auth, __initial_auth_token);
+                    } else {
+                        await signInAnonymously(auth);
+                    }
+
+                    onAuthStateChanged(auth, (user) => {
+                        if (user) {
+                            currentUser = user;
+                            dot.className = 'w-2 h-2 rounded-full bg-cyber-emerald';
+                            statusText.textContent = 'Cloud Online';
+                            subscribeRacerLeaderboard();
+                            loadUserProfile();
+                        }
+                    });
+                } else {
+                    dot.className = 'w-2 h-2 rounded-full bg-cyber-cyan';
+                    statusText.textContent = 'Session Mode';
+                    renderRacerLeaderboard();
+                }
+            } catch (err) {
+                console.error("Cloud init warning:", err);
+                dot.className = 'w-2 h-2 rounded-full bg-amber-400';
+                statusText.textContent = 'Offline Mode';
+                renderRacerLeaderboard();
+            }
+        }
+
+        function subscribeRacerLeaderboard() {
+            if (!db || !currentUser) return;
+            const colRef = collection(db, 'artifacts', appId, 'public', 'data', 'racer_scores');
+            onSnapshot(colRef, (snapshot) => {
+                const cloudScores = [];
+                snapshot.forEach(docSnap => {
+                    cloudScores.push(docSnap.data());
+                });
+                if (cloudScores.length > 0) {
+                    localRacerScores = cloudScores;
+                }
+                renderRacerLeaderboard();
+            }, (error) => {
+                console.error("Leaderboard snapshot error:", error);
+            });
+        }
+
+        async function saveRacerScoreToCloud(trackIndex, finishTime, lineCount) {
+            const nickname = (document.getElementById('player-name').value || 'Racer_01').trim();
+            const entry = {
+                nickname,
+                trackIndex,
+                time: Number(finishTime.toFixed(2)),
+                lines: lineCount,
+                timestamp: Date.now(),
+                uid: currentUser ? currentUser.uid : 'guest'
+            };
+
+            localRacerScores.push(entry);
+            renderRacerLeaderboard();
+
+            if (db && currentUser) {
+                try {
+                    const colRef = collection(db, 'artifacts', appId, 'public', 'data', 'racer_scores');
+                    await addDoc(colRef, entry);
+                    showToast('Skor berhasil disimpan ke papan peringkat!', 'success');
+                } catch (e) {
+                    console.error("Save score failed:", e);
+                }
+            } else {
+                showToast(`Rekor selesai: ${entry.time}s dicatat!`, 'success');
+            }
+        }
+
+        async function loadUserProfile() {
+            if (!db || !currentUser) return;
+            try {
+                const docRef = doc(db, 'artifacts', appId, 'users', currentUser.uid, 'profile', 'settings');
+                const snap = await getDoc(docRef);
+                if (snap.exists() && snap.data().nickname) {
+                    document.getElementById('player-name').value = snap.data().nickname;
+                }
+            } catch (e) {
+                console.error("Load profile error:", e);
+            }
+        }
+
+        window.saveNickname = async function() {
+            showToast('Nama pembalap diperbarui.', 'info');
+            if (!db || !currentUser) return;
+            try {
+                const nickname = (document.getElementById('player-name').value || 'Racer_01').trim();
+                const docRef = doc(db, 'artifacts', appId, 'users', currentUser.uid, 'profile', 'settings');
+                await setDoc(docRef, { nickname, updatedAt: Date.now() }, { merge: true });
+            } catch (e) {
+                console.error("Save nickname error:", e);
+            }
+        };
+
+        // ==========================================
+        // 2. UI UTILITIES
+        // ==========================================
+        window.toggleHelpModal = function(show) {
+            const modal = document.getElementById('help-modal');
+            if (show) modal.classList.remove('hidden');
+            else modal.classList.add('hidden');
+        };
+
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            const colors = {
+                success: 'border-cyber-emerald bg-cyber-panel text-cyber-emerald',
+                error: 'border-cyber-rose bg-cyber-panel text-cyber-rose',
+                info: 'border-cyber-cyan bg-cyber-panel text-cyber-cyan'
+            };
+            toast.className = `pointer-events-auto px-4 py-3 rounded-xl border ${colors[type] || colors.info} shadow-2xl text-xs font-semibold flex items-center gap-2 transition-all duration-300`;
+            toast.innerHTML = `<i class="fa-solid fa-circle-info"></i><span>${message}</span>`;
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                setTimeout(() => toast.remove(), 300);
+            }, 3200);
+        }
+
+        // ==========================================
+        // 3. VECTOR RACER ENGINE (MATHEMATICALLY VERIFIED PATHS)
+        // ==========================================
+        // Virtual Coordinate Space: 800 x 500
+        // Note: Standard math angles: 0 deg = +X (right), 90 deg = -Y (up on screen), 180 deg = -X (left), -90 deg = +Y (down on screen)
+        const TRACKS = [
+            {
+                name: "Orbital Chicane",
+                difficulty: "Pemula",
+                roadWidth: 80,
+                startPos: { x: 150, y: 400 },
+                startAngle: 0,
+                points: [
+                    { x: 150, y: 400 },
+                    { x: 650, y: 400 },
+                    { x: 650, y: 250 },
+                    { x: 450, y: 250 },
+                    { x: 450, y: 100 },
+                    { x: 150, y: 100 }
+                ],
+                checkpoints: [
+                    { x: 650, y: 325, radius: 44, label: "CP-1" },
+                    { x: 450, y: 175, radius: 44, label: "CP-2" },
+                    { x: 150, y: 250, radius: 44, label: "CP-3" }
+                ],
+                finishLine: { x: 150, y: 400, radius: 44 },
+                // Exact kinematics:
+                // Seg 1: (150,400)->(650,400) dx=+500. Accel +100 for 2s (v=200, dx=200), coast 0.5s (dx=100), decel -100 for 2s (v=0, dx=200). Total t=4.5s
+                // Seg 2: (650,400)->(650,250) dy=-150 (up=90deg). Accel 75 for 1s (v=75, dy=-37.5), coast 1s (dy=-75), decel -90deg 75 for 1s (v=0, dy=-37.5). Total t=7.5s
+                // Seg 3: (650,250)->(450,250) dx=-200 (left=180deg). Accel 100 for 1s (v=100, dx=-50), coast 1s (dx=-100), decel 0deg 100 for 1s (v=0, dx=-50). Total t=10.5s
+                // Seg 4: (450,250)->(450,100) dy=-150 (up=90deg). Accel 75 for 1s, coast 1s, decel -90deg 75 for 1s. Total t=13.5s
+                // Seg 5: (450,100)->(150,100) dx=-300 (left=180deg). Accel 100 for 1.5s (v=150, dx=-112.5), coast 0.5s (dx=-75), decel 0deg 100 for 1.5s (v=0, dx=-112.5). Total t=17.0s
+                // Seg 6: (150,100)->(150,400) dy=+300 (down=-90deg). Accel 100 for 1.5s, coast 0.5s, decel 90deg 100 for 1.5s. Total t=20.5s
+                sampleScript: `# Orbital Chicane - Jalur Presisi Tengah Lintasan
+# waktu_mulai, durasi, percepatan, sudut(deg)
+
+# 1. Lurus bawah ke kanan (150,400 -> 650,400)
+0.0, 2.0, 100, 0
+2.5, 2.0, 100, 180
+
+# 2. Naik ke atas melewati CP-1 (650,400 -> 650,250)
+4.5, 1.0, 75, 90
+6.5, 1.0, 75, -90
+
+# 3. Belok kiri ke tengah (650,250 -> 450,250)
+7.5, 1.0, 100, 180
+9.5, 1.0, 100, 0
+
+# 4. Naik ke atas melewati CP-2 (450,250 -> 450,100)
+10.5, 1.0, 75, 90
+12.5, 1.0, 75, -90
+
+# 5. Lurus atas ke kiri (450,100 -> 150,100)
+13.5, 1.5, 100, 180
+15.5, 1.5, 100, 0
+
+# 6. Turun melewati CP-3 menuju Finish (150,100 -> 150,400)
+17.0, 1.5, 100, -90
+19.0, 1.5, 100, 90`
+            },
+            {
+                name: "Canyon Hairpin",
+                difficulty: "Menengah",
+                roadWidth: 74,
+                startPos: { x: 150, y: 100 },
+                startAngle: 0,
+                points: [
+                    { x: 150, y: 100 },
+                    { x: 650, y: 100 },
+                    { x: 650, y: 240 },
+                    { x: 330, y: 240 },
+                    { x: 330, y: 380 },
+                    { x: 650, y: 380 },
+                    { x: 650, y: 445 },
+                    { x: 150, y: 445 }
+                ],
+                checkpoints: [
+                    { x: 650, y: 170, radius: 40, label: "CP-1" },
+                    { x: 330, y: 310, radius: 40, label: "CP-2" },
+                    { x: 150, y: 270, radius: 40, label: "CP-3" }
+                ],
+                finishLine: { x: 150, y: 100, radius: 40 },
+                sampleScript: `# Canyon Hairpin - Jalur Presisi S-Bend
+# waktu_mulai, durasi, percepatan, sudut(deg)
+
+# 1. Kanan atas (150,100 -> 650,100)
+0.0, 2.0, 100, 0
+2.5, 2.0, 100, 180
+
+# 2. Turun melewati CP-1 (650,100 -> 650,240, dy=140)
+4.5, 1.0, 70, -90
+6.5, 1.0, 70, 90
+
+# 3. Kiri ke tengah (650,240 -> 330,240, dx=-320)
+7.5, 1.6, 100, 180
+9.5, 1.6, 100, 0
+
+# 4. Turun melewati CP-2 (330,240 -> 330,380, dy=140)
+11.1, 1.0, 70, -90
+13.1, 1.0, 70, 90
+
+# 5. Kanan bawah (330,380 -> 650,380, dx=320)
+14.1, 1.6, 100, 0
+16.1, 1.6, 100, 180
+
+# 6. Turun sedikit ke jalur balik (650,380 -> 650,445, dy=65)
+17.7, 0.5, 130, -90
+18.7, 0.5, 130, 90
+
+# 7. Lurus panjang ke kiri bawah (650,445 -> 150,445, dx=-500)
+19.2, 2.0, 100, 180
+21.7, 2.0, 100, 0
+
+# 8. Naik panjang melewati CP-3 ke Finish (150,445 -> 150,100, dy=-345)
+23.7, 1.5, 115, 90
+25.7, 1.5, 115, -90`
+            },
+            {
+                name: "Reactor Loop",
+                difficulty: "Ahli",
+                roadWidth: 76,
+                startPos: { x: 400, y: 420 },
+                startAngle: 0,
+                points: [
+                    { x: 400, y: 420 },
+                    { x: 660, y: 420 },
+                    { x: 660, y: 100 },
+                    { x: 140, y: 100 },
+                    { x: 140, y: 420 }
+                ],
+                checkpoints: [
+                    { x: 660, y: 260, radius: 42, label: "CP-1" },
+                    { x: 400, y: 100, radius: 42, label: "CP-2" },
+                    { x: 140, y: 260, radius: 42, label: "CP-3" }
+                ],
+                finishLine: { x: 400, y: 420, radius: 42 },
+                sampleScript: `# Reactor Loop - Sirkuit Kecepatan Tinggi
+# waktu_mulai, durasi, percepatan, sudut(deg)
+
+# 1. Start ke pojok kanan bawah (400,420 -> 660,420, dx=260)
+0.0, 1.3, 100, 0
+2.0, 1.3, 100, 180
+
+# 2. Melaju ke atas melewati CP-1 (660,420 -> 660,100, dy=-320)
+3.3, 1.6, 100, 90
+5.3, 1.6, 100, -90
+
+# 3. Lurus panjang atas melewati CP-2 (660,100 -> 140,100, dx=-520)
+6.9, 2.0, 130, 180
+8.9, 2.0, 130, 0
+
+# 4. Turun melewati CP-3 (140,100 -> 140,420, dy=320)
+10.9, 1.6, 100, -90
+12.9, 1.6, 100, 90
+
+# 5. Sprint akhir ke garis Finish (140,420 -> 400,420, dx=260)
+14.5, 1.3, 100, 0
+16.5, 1.3, 100, 180`
+            }
+        ];
+
+        let currentTrackIdx = 0;
+        let racerState = {
+            running: false,
+            finished: false,
+            crashed: false,
+            time: 0,
+            x: 140,
+            y: 400,
+            vx: 0,
+            vy: 0,
+            ax: 0,
+            ay: 0,
+            accMag: 0,
+            accAngle: 0,
+            trail: [],
+            clearedCheckpoints: new Set(),
+            leftStartZone: false
+        };
+
+        let racerAnimId = null;
+        let lastFrameTimestamp = null;
+
+        function appendRaceLog(msg, colorClass = 'text-slate-300') {
+            const logEl = document.getElementById('race-log');
+            const line = document.createElement('div');
+            line.className = colorClass;
+            line.textContent = `> ${msg}`;
+            logEl.appendChild(line);
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+
+        window.clearRaceLog = function() {
+            document.getElementById('race-log').innerHTML = '';
+        };
+
+        window.selectTrack = function(idx) {
+            currentTrackIdx = idx;
+            document.querySelectorAll('.track-btn').forEach(btn => {
+                const isSelected = Number(btn.dataset.track) === idx;
+                btn.className = isSelected
+                    ? "track-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-cyber-cyan text-cyber-bg"
+                    : "track-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-cyber-card text-slate-300 hover:text-white";
+            });
+            const track = TRACKS[idx];
+            document.getElementById('track-difficulty').textContent = `Kesulitan: ${track.difficulty}`;
+            document.getElementById('lb-track-name').textContent = track.name;
+            racerReset();
+            renderRacerLeaderboard();
+            appendRaceLog(`Sirkuit dimuat: ${track.name} (${track.difficulty}).`, 'text-cyber-cyan');
+        };
+
+        window.loadSampleSolution = function() {
+            const track = TRACKS[currentTrackIdx];
+            document.getElementById('accel-script').value = track.sampleScript;
+            racerReset();
+            appendRaceLog(`Contoh solusi dimuat untuk ${track.name}. Tekan Run!`, 'text-cyber-purple');
+        };
+
+        window.importScript = function(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                document.getElementById('accel-script').value = e.target.result;
+                racerReset();
+                appendRaceLog(`File "${file.name}" berhasil diimpor.`, 'text-cyber-emerald');
+            };
+            reader.readAsText(file);
+        };
+
+        window.exportScript = function() {
+            const text = document.getElementById('accel-script').value;
+            const blob = new Blob([text], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `vector_racer_${TRACKS[currentTrackIdx].name.toLowerCase().replace(/\s+/g, '_')}.txt`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showToast('Script berhasil diekspor ke .txt', 'success');
+        };
+
+        function parseThrusterCommands() {
+            const raw = document.getElementById('accel-script').value;
+            const lines = raw.split('\n');
+            const commands = [];
+            for (const line of lines) {
+                const clean = line.split('#')[0].trim();
+                if (!clean) continue;
+                const parts = clean.split(',').map(s => parseFloat(s.trim()));
+                if (parts.length >= 4 && parts.every(n => !isNaN(n))) {
+                    commands.push({
+                        start: parts[0],
+                        duration: Math.max(0, parts[1]),
+                        accel: parts[2],
+                        angleDeg: parts[3]
+                    });
+                }
+            }
+            return commands;
+        }
+
+        function getActiveAcceleration(time, commands) {
+            for (const cmd of commands) {
+                if (time >= cmd.start && time <= cmd.start + cmd.duration) {
+                    const rad = (cmd.angleDeg * Math.PI) / 180;
+                    // Note: Canvas Y increases downward, while standard math angle 90 deg is UP (-Y)
+                    return {
+                        ax: cmd.accel * Math.cos(rad),
+                        ay: -cmd.accel * Math.sin(rad),
+                        mag: cmd.accel,
+                        angleDeg: cmd.angleDeg
+                    };
+                }
+            }
+            return { ax: 0, ay: 0, mag: 0, angleDeg: 0 };
+        }
+
+        // Distance from point (px, py) to segment (x1, y1)-(x2, y2)
+        function distToSegment(px, py, x1, y1, x2, y2) {
+            const l2 = (x2 - x1) ** 2 + (y2 - y1) ** 2;
+            if (l2 === 0) return Math.hypot(px - x1, py - y1);
+            let t = ((px - x1) * (x2 - x1) + (py - y1) * (y2 - y1)) / l2;
+            t = Math.max(0, Math.min(1, t));
+            const projX = x1 + t * (x2 - x1);
+            const projY = y1 + t * (y2 - y1);
+            return Math.hypot(px - projX, py - projY);
+        }
+
+        function isInsideTrack(x, y, track) {
+            const pts = track.points;
+            const halfWidth = track.roadWidth / 2;
+            for (let i = 0; i < pts.length; i++) {
+                const p1 = pts[i];
+                const p2 = pts[(i + 1) % pts.length];
+                if (distToSegment(x, y, p1.x, p1.y, p2.x, p2.y) <= halfWidth) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        function stepPhysics(dt) {
+            if (racerState.finished || racerState.crashed) return;
+
+            const track = TRACKS[currentTrackIdx];
+            const commands = parseThrusterCommands();
+            const acc = getActiveAcceleration(racerState.time, commands);
+
+            racerState.ax = acc.ax;
+            racerState.ay = acc.ay;
+            racerState.accMag = acc.mag;
+            racerState.accAngle = acc.angleDeg;
+
+            // Semi-implicit Euler integration
+            racerState.vx += racerState.ax * dt;
+            racerState.vy += racerState.ay * dt;
+            racerState.x += racerState.vx * dt;
+            racerState.y += racerState.vy * dt;
+            racerState.time += dt;
+
+            if (racerState.trail.length === 0 ||
+                Math.hypot(racerState.x - racerState.trail[racerState.trail.length - 1].x,
+                           racerState.y - racerState.trail[racerState.trail.length - 1].y) > 4) {
+                racerState.trail.push({ x: racerState.x, y: racerState.y });
+            }
+
+            // Check wall collision
+            if (!isInsideTrack(racerState.x, racerState.y, track)) {
+                racerState.crashed = true;
+                racerState.running = false;
+                updateRacerBadge('CRASHED', 'bg-cyber-rose/20 text-cyber-rose');
+                appendRaceLog(`TABRAKAN DINDING pada t = ${racerState.time.toFixed(2)}s! Sesuaikan sudut atau durasi.`, 'text-cyber-rose');
+                return;
+            }
+
+            // Check sequential checkpoints
+            track.checkpoints.forEach((cp, idx) => {
+                const d = Math.hypot(racerState.x - cp.x, racerState.y - cp.y);
+                if (d <= cp.radius && !racerState.clearedCheckpoints.has(idx)) {
+                    // Enforce sequential order
+                    if (idx === racerState.clearedCheckpoints.size) {
+                        racerState.clearedCheckpoints.add(idx);
+                        appendRaceLog(`${cp.label} terlewati pada ${racerState.time.toFixed(2)}s!`, 'text-cyber-emerald');
+                    }
+                }
+            });
+
+            // Detect leaving start zone so player must actually loop around
+            const distFromStart = Math.hypot(racerState.x - track.finishLine.x, racerState.y - track.finishLine.y);
+            if (distFromStart > track.finishLine.radius + 15) {
+                racerState.leftStartZone = true;
+            }
+
+            // Check finish condition
+            if (racerState.leftStartZone &&
+                racerState.clearedCheckpoints.size === track.checkpoints.length &&
+                distFromStart <= track.finishLine.radius) {
+                racerState.finished = true;
+                racerState.running = false;
+                updateRacerBadge('FINISHED', 'bg-cyber-emerald/20 text-cyber-emerald');
+                appendRaceLog(`FINISH! Semua checkpoint selesai dalam ${racerState.time.toFixed(2)} detik!`, 'text-cyber-amber');
+                const validLines = parseThrusterCommands().length;
+                saveRacerScoreToCloud(currentTrackIdx, racerState.time, validLines);
+            }
+        }
+
+        function updateRacerBadge(text, classes) {
+            const badge = document.getElementById('racer-status-badge');
+            badge.textContent = text;
+            badge.className = `text-[11px] font-mono px-2 py-0.5 rounded ${classes}`;
+        }
+
+        function updateTelemetryHUD() {
+            const track = TRACKS[currentTrackIdx];
+            const speed = Math.hypot(racerState.vx, racerState.vy);
+            document.getElementById('tel-time').textContent = `${racerState.time.toFixed(2)} s`;
+            document.getElementById('tel-speed').textContent = `${speed.toFixed(1)} px/s`;
+            document.getElementById('tel-cp').textContent = `${racerState.clearedCheckpoints.size} / ${track.checkpoints.length}`;
+            document.getElementById('tel-pos').textContent = `${Math.round(racerState.x)}, ${Math.round(500 - racerState.y)}`;
+            document.getElementById('tel-vel').textContent = `${racerState.vx.toFixed(1)} / ${(-racerState.vy).toFixed(1)}`;
+            document.getElementById('tel-acc').textContent = `${racerState.accMag} @ ${racerState.accAngle}°`;
+        }
+
+        window.racerRun = function() {
+            if (racerState.finished || racerState.crashed) {
+                racerReset();
+            }
+            if (racerState.running) return;
+            racerState.running = true;
+            lastFrameTimestamp = performance.now();
+            updateRacerBadge('SIMULATING', 'bg-cyber-cyan/20 text-cyber-cyan');
+            appendRaceLog('Simulasi telemetri dimulai...', 'text-slate-400');
+            racerAnimId = requestAnimationFrame(racerLoop);
+        };
+
+        window.racerPause = function() {
+            racerState.running = false;
+            if (racerAnimId) cancelAnimationFrame(racerAnimId);
+            if (!racerState.finished && !racerState.crashed) {
+                updateRacerBadge('PAUSED', 'bg-cyber-amber/20 text-cyber-amber');
+            }
+        };
+
+        window.racerStep = function() {
+            racerPause();
+            stepPhysics(0.1); // 0.1s discrete physics step
+            updateTelemetryHUD();
+            drawRacerCanvas();
+        };
+
+        window.racerReset = function() {
+            racerPause();
+            const track = TRACKS[currentTrackIdx];
+            racerState = {
+                running: false,
+                finished: false,
+                crashed: false,
+                time: 0,
+                x: track.startPos.x,
+                y: track.startPos.y,
+                vx: 0,
+                vy: 0,
+                ax: 0,
+                ay: 0,
+                accMag: 0,
+                accAngle: 0,
+                trail: [{ x: track.startPos.x, y: track.startPos.y }],
+                clearedCheckpoints: new Set(),
+                leftStartZone: false
+            };
+            updateRacerBadge('STANDBY', 'bg-cyber-card text-cyber-cyan');
+            updateTelemetryHUD();
+            drawRacerCanvas();
+        };
+
+        function racerLoop(timestamp) {
+            if (!racerState.running) return;
+            const rawDt = (timestamp - lastFrameTimestamp) / 1000;
+            lastFrameTimestamp = timestamp;
+            const dt = Math.min(rawDt, 0.05);
+
+            // Sub-stepping for smooth collision detection
+            const subSteps = 4;
+            for (let i = 0; i < subSteps; i++) {
+                stepPhysics(dt / subSteps);
+                if (racerState.crashed || racerState.finished) break;
+            }
+
+            updateTelemetryHUD();
+            drawRacerCanvas();
+
+            if (racerState.running) {
+                racerAnimId = requestAnimationFrame(racerLoop);
+            }
+        }
+
+        function drawArrow(ctx, fromX, fromY, toX, toY, color, lineWidth = 2.5) {
+            const headLen = 9;
+            const dx = toX - fromX;
+            const dy = toY - fromY;
+            const len = Math.hypot(dx, dy);
+            if (len < 3) return;
+            const angle = Math.atan2(dy, dx);
+
+            ctx.save();
+            ctx.strokeStyle = color;
+            ctx.fillStyle = color;
+            ctx.lineWidth = lineWidth;
+
+            ctx.beginPath();
+            ctx.moveTo(fromX, fromY);
+            ctx.lineTo(toX, toY);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(toX, toY);
+            ctx.lineTo(toX - headLen * Math.cos(angle - Math.PI / 6), toY - headLen * Math.sin(angle - Math.PI / 6));
+            ctx.lineTo(toX - headLen * Math.cos(angle + Math.PI / 6), toY - headLen * Math.sin(angle + Math.PI / 6));
+            ctx.closePath();
+            ctx.fill();
+            ctx.restore();
+        }
+
+        window.drawRacerCanvas = function() {
+            const canvas = document.getElementById('racer-canvas');
+            const ctx = canvas.getContext('2d');
+            const w = canvas.width;
+            const h = canvas.height;
+            if (!w || !h) return;
+
+            const scaleX = w / 800;
+            const scaleY = h / 500;
+
+            ctx.save();
+            ctx.clearRect(0, 0, w, h);
+
+            // 1. Cyber Blueprint Grid Background
+            ctx.fillStyle = '#040812';
+            ctx.fillRect(0, 0, w, h);
+
+            ctx.strokeStyle = 'rgba(0, 240, 255, 0.06)';
+            ctx.lineWidth = 1;
+            const gridStep = 25 * scaleX;
+            for (let gx = 0; gx < w; gx += gridStep) {
+                ctx.beginPath();
+                ctx.moveTo(gx, 0);
+                ctx.lineTo(gx, h);
+                ctx.stroke();
+            }
+            for (let gy = 0; gy < h; gy += gridStep) {
+                ctx.beginPath();
+                ctx.moveTo(0, gy);
+                ctx.lineTo(w, gy);
+                ctx.stroke();
+            }
+
+            ctx.scale(scaleX, scaleY);
+            const track = TRACKS[currentTrackIdx];
+
+            // 2. Track Outer Kerb (Red & White Racing Curbs)
+            ctx.lineJoin = 'round';
+            ctx.lineCap = 'round';
+
+            ctx.beginPath();
+            track.points.forEach((pt, idx) => {
+                if (idx === 0) ctx.moveTo(pt.x, pt.y);
+                else ctx.lineTo(pt.x, pt.y);
+            });
+            ctx.closePath();
+
+            // Base white kerb border
+            ctx.strokeStyle = '#F8FAFC';
+            ctx.lineWidth = track.roadWidth + 8;
+            ctx.stroke();
+
+            // Dashed red/cyan racing kerb overlay
+            ctx.save();
+            ctx.setLineDash([14, 14]);
+            ctx.strokeStyle = '#FF2A6D';
+            ctx.lineWidth = track.roadWidth + 8;
+            ctx.stroke();
+            ctx.restore();
+
+            // 3. Track Asphalt Surface
+            ctx.strokeStyle = '#1E293B';
+            ctx.lineWidth = track.roadWidth;
+            ctx.stroke();
+
+            // 4. Center Telemetry Dashed Line
+            ctx.save();
+            ctx.setLineDash([12, 12]);
+            ctx.strokeStyle = 'rgba(0, 240, 255, 0.25)';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.restore();
+
+            // 5. Checkpoints
+            track.checkpoints.forEach((cp, idx) => {
+                const cleared = racerState.clearedCheckpoints.has(idx);
+                ctx.beginPath();
+                ctx.arc(cp.x, cp.y, cp.radius, 0, Math.PI * 2);
+                ctx.fillStyle = cleared ? 'rgba(5, 255, 161, 0.16)' : 'rgba(157, 78, 221, 0.16)';
+                ctx.fill();
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = cleared ? '#05FFA1' : '#9D4EDD';
+                ctx.stroke();
+
+                ctx.fillStyle = cleared ? '#05FFA1' : '#E2E8F0';
+                ctx.font = 'bold 11px "JetBrains Mono"';
+                ctx.textAlign = 'center';
+                ctx.fillText(cp.label, cp.x, cp.y + 4);
+            });
+
+            // 6. Start / Finish Gate
+            const fl = track.finishLine;
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(fl.x, fl.y, fl.radius, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(255, 183, 3, 0.15)';
+            ctx.fill();
+            ctx.setLineDash([6, 4]);
+            ctx.strokeStyle = '#FFB703';
+            ctx.lineWidth = 2.5;
+            ctx.stroke();
+            ctx.fillStyle = '#FFB703';
+            ctx.font = 'bold 10px "JetBrains Mono"';
+            ctx.textAlign = 'center';
+            ctx.fillText('START/FINISH', fl.x, fl.y - fl.radius - 6);
+            ctx.restore();
+
+            // 7. Trajectory Trail
+            if (racerState.trail.length > 1) {
+                ctx.beginPath();
+                racerState.trail.forEach((pt, idx) => {
+                    if (idx === 0) ctx.moveTo(pt.x, pt.y);
+                    else ctx.lineTo(pt.x, pt.y);
+                });
+                ctx.strokeStyle = '#00F0FF';
+                ctx.lineWidth = 2.5;
+                ctx.stroke();
+            }
+
+            // 8. Top-Down Formula / Cyber Race Car
+            ctx.save();
+            ctx.translate(racerState.x, racerState.y);
+            const heading = Math.hypot(racerState.vx, racerState.vy) > 1
+                ? Math.atan2(racerState.vy, racerState.vx)
+                : 0;
+            ctx.rotate(heading);
+
+            // Exhaust booster flame when accelerating
+            if (racerState.accMag > 0 && racerState.running) {
+                ctx.beginPath();
+                ctx.moveTo(-14, -3.5);
+                ctx.lineTo(-26 - Math.random() * 7, 0);
+                ctx.lineTo(-14, 3.5);
+                ctx.fillStyle = '#FFB703';
+                ctx.fill();
+            }
+
+            // Tires (4 wheels)
+            ctx.fillStyle = '#090D16';
+            ctx.strokeStyle = '#64748B';
+            ctx.lineWidth = 1;
+            // Rear Left & Right
+            ctx.fillRect(-11, -11, 7, 3.5);
+            ctx.strokeRect(-11, -11, 7, 3.5);
+            ctx.fillRect(-11, 7.5, 7, 3.5);
+            ctx.strokeRect(-11, 7.5, 7, 3.5);
+            // Front Left & Right
+            ctx.fillRect(5, -10.5, 6.5, 3);
+            ctx.strokeRect(5, -10.5, 6.5, 3);
+            ctx.fillRect(5, 7.5, 6.5, 3);
+            ctx.strokeRect(5, 7.5, 6.5, 3);
+
+            // Rear Spoiler Wing
+            ctx.fillStyle = racerState.crashed ? '#FF2A6D' : '#9D4EDD';
+            ctx.fillRect(-14, -9, 3.5, 18);
+
+            // Car Main Chassis Body
+            ctx.beginPath();
+            ctx.moveTo(16, 0);        // Nose cone tip
+            ctx.lineTo(9, -5.5);
+            ctx.lineTo(-3, -7.5);
+            ctx.lineTo(-12, -6.5);
+            ctx.lineTo(-12, 6.5);
+            ctx.lineTo(-3, 7.5);
+            ctx.lineTo(9, 5.5);
+            ctx.closePath();
+            ctx.fillStyle = racerState.crashed ? '#FF2A6D' : '#F8FAFC';
+            ctx.fill();
+            ctx.strokeStyle = '#00F0FF';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+
+            // Front Wing
+            ctx.fillStyle = '#00F0FF';
+            ctx.fillRect(12, -8.5, 2.5, 17);
+
+            // Driver Cockpit Canopy
+            ctx.beginPath();
+            ctx.ellipse(0, 0, 5, 3, 0, 0, Math.PI * 2);
+            ctx.fillStyle = '#060B19';
+            ctx.fill();
+            ctx.strokeStyle = '#00F0FF';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            ctx.restore();
+
+            // 9. Real-time Velocity & Acceleration Vectors
+            if (document.getElementById('toggle-vectors').checked) {
+                // Velocity vector (scaled x0.7)
+                drawArrow(
+                    ctx,
+                    racerState.x,
+                    racerState.y,
+                    racerState.x + racerState.vx * 0.7,
+                    racerState.y + racerState.vy * 0.7,
+                    '#FF2A6D',
+                    2.5
+                );
+                // Acceleration vector (scaled x0.8)
+                drawArrow(
+                    ctx,
+                    racerState.x,
+                    racerState.y,
+                    racerState.x + racerState.ax * 0.8,
+                    racerState.y + racerState.ay * 0.8,
+                    '#FFB703',
+                    2.5
+                );
+            }
+
+            ctx.restore();
+        };
+
+        function resizeRacerCanvas() {
+            const canvas = document.getElementById('racer-canvas');
+            const rect = canvas.parentElement.getBoundingClientRect();
+            const dpr = window.devicePixelRatio || 1;
+            const width = rect.width || 800;
+            const height = rect.height || 500;
+            canvas.width = Math.round(width * dpr);
+            canvas.height = Math.round(height * dpr);
+            drawRacerCanvas();
+        }
+
+        function renderRacerLeaderboard() {
+            const tbody = document.getElementById('racer-leaderboard-body');
+            const filtered = localRacerScores
+                .filter(s => s.trackIndex === currentTrackIdx)
+                .sort((a, b) => a.time - b.time)
+                .slice(0, 5);
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="4" class="py-3 text-center text-slate-500">Belum ada rekor di lintasan ini. Jadilah yang pertama!</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = filtered.map((item, idx) => `
+                <tr class="hover:bg-cyber-card/40 transition">
+                    <td class="py-2 px-2 font-bold ${idx === 0 ? 'text-cyber-amber' : 'text-slate-400'}">${idx + 1}</td>
+                    <td class="py-2 px-2 text-white">${escapeHTML(item.nickname)}</td>
+                    <td class="py-2 px-2 text-cyber-emerald font-bold">${Number(item.time).toFixed(2)}s</td>
+                    <td class="py-2 px-2 text-slate-400">${item.lines || '-'} baris</td>
+                </tr>
+            `).join('');
+        }
+
+        function escapeHTML(str) {
+            return String(str).replace(/[&<>"']/g, m => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            }[m]));
+        }
+
+        // ==========================================
+        // 4. BOOTSTRAP ON WINDOW LOAD
+        // ==========================================
+        window.addEventListener('resize', () => {
+            resizeRacerCanvas();
+        });
+
+        window.onload = function() {
+            initCloud();
+            selectTrack(0);
+            loadSampleSolution();
+            resizeRacerCanvas();
+        };
+    </script>
+</body>
+</html>
